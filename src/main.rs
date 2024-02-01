@@ -9,7 +9,7 @@ mod stream_manager;
 mod transcoder;
 
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
-pub mod proto {
+pub mod service {
     tonic::include_proto!("kawa");
 }
 
