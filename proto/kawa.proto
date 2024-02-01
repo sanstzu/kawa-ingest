@@ -47,19 +47,19 @@ message StreamSessionResponse {
 
 enum SessionInitializationEnums {
     SESSION_INITIALIZE_OK = 0;
-    DUPLICATE_ID = 1;
-    INTERNAL_ERROR = 15;
+    SESSION_INITIALIZE_DUPLICATE_ID = 1;
+    SESSION_INITIALIZE_INTERNAL_ERROR = 15;
 }
 
 enum SessionCloseEnums {
-    SESSION_CLOSED_OK = 0;
-    SESSION_ID_NOT_FOUND = 1;
-    INTERNAL_ERROR = 15;
+    SESSION_CLOSE_OK = 0;
+    SESSION_CLOSE_ID_NOT_FOUND = 1;
+    SESSION_CLOSE_INTERNAL_ERROR = 15;
 }
 
 enum StreamResponseEnums {
     STREAM_STOPPED_OK = 0;
-    INTERNAL_ERROR = 15;
+    STREAM_INTERNAL_ERROR = 15;
 }
 
 enum StreamDataType {
