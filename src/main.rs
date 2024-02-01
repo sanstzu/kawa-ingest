@@ -1,6 +1,6 @@
 use connection::Connection;
 use dotenv::dotenv;
-use log::info;
+use log::{error, info};
 use tokio::net::TcpListener;
 
 mod connection;
@@ -28,7 +28,9 @@ async fn main() -> Result<(), BoxError> {
         );
 
         tokio::spawn(async move {
-            connection.start_handshake(stream).await;
+            if let Err(e) = connection.start_handshake(stream).await {
+                error!("Connection {}: Error: {}", counter, e);
+            }
         });
 
         counter += 1;
