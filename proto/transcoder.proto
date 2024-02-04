@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package transcoder;
+
+service Transcoder {
+    rpc InitializeSession(InitializeSessionRequest) returns (InitializeSessionResponse) {}
+
+    rpc CloseSession(CloseSessionRequest) returns (CloseSessionResponse) {}
+
+    rpc StreamSession(stream StreamSessionData) returns (StreamSessionResponse) {}
+}
+
+message InitializeSessionRequest {
+    int32 id = 1; // counter will be used
+    string publish_url = 2;
+}
+
+message InitializeSessionResponse {
+    SessionInitializationEnums status = 1;
+    uint64 session_id = 2; // 0 if status != OK
+}
+
+message CheckSessionRequest {
+    uint64 session_id = 1;
+}
+
+message CheckSessionResponse {
+    SessionCheckEnums status = 1;
+}
+
+message CloseSessionRequest {
+    uint64 session_id = 1;
+}
+
+message CloseSessionResponse {
+    SessionCloseEnums status = 1;
+}
+
+message StreamSessionData {
+    uint64 session_id = 1;
+    StreamDataType type = 2;
+    bytes data = 3;
+}
+
+message StreamSessionResponse {
+    StreamResponseEnums status = 1;
+}
+
+enum SessionInitializationEnums {
+    SESSION_INITIALIZE_OK = 0;
+    SESSION_INITIALIZE_DUPLICATE_ID = 1;
+    SESSION_INITIALIZE_INTERNAL_ERROR = 15;
+}
+
+enum SessionCloseEnums {
+    SESSION_CLOSE_OK = 0;
+    SESSION_CLOSE_ID_NOT_FOUND = 1;
+    SESSION_CLOSE_INTERNAL_ERROR = 15;
+}
+
+enum SessionCheckEnums {
+    SESSION_CHECK_OK = 0;
+    SESSION_CHECK_ID_NOT_FOUND = 1;
+    SESSION_CHECK_ID_IS_STREAMING = 2;
+    SESSION_CHECK_INTERNAL_ERROR = 15;
+}
+
+enum StreamResponseEnums {
+    STREAM_STOPPED_OK = 0;
+    STREAM_INTERNAL_ERROR = 15;
+}
+
+enum StreamDataType {
+    VIDEO = 0;
+    AUDIO = 1;
+}

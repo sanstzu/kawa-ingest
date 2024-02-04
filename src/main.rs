@@ -10,7 +10,7 @@ mod transcoder;
 
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 pub mod service {
-    tonic::include_proto!("kawa");
+    tonic::include_proto!("transcoder");
 }
 
 #[tokio::main]
@@ -30,10 +30,12 @@ async fn main() -> Result<(), BoxError> {
 
         info!(
             "Connection {}: New connection from {}",
-            counter, connection_info
+            counter,
+            connection_info.ip()
         );
 
         tokio::spawn(async move {
+            // Checks if the following stream_id
             if let Err(e) = connection.start_handshake(stream).await {
                 error!("Connection {}: Error: {}", counter, e);
             }
