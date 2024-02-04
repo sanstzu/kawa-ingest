@@ -6,8 +6,9 @@ use bytes::Bytes;
 use futures::future::select_all;
 use futures::future::BoxFuture;
 use log::info;
-use log::trace;
+
 use log::warn;
+use prost::Message;
 use rml_rtmp::sessions::StreamMetadata;
 use rml_rtmp::time::RtmpTimestamp;
 use std::collections::hash_map::HashMap;
@@ -18,6 +19,8 @@ pub use connection_message::ConnectionMessage;
 use futures::FutureExt;
 pub use publish_details::PublishDetails;
 pub use stream_manager_message::StreamManagerMessage;
+
+use crate::transcoder::{Message as TranscoderMessage, TranscoderManager};
 
 pub fn start() -> mpsc::UnboundedSender<StreamManagerMessage> {
     let (sender, receiver) = mpsc::unbounded_channel();
@@ -42,6 +45,7 @@ struct StreamManager<'a> {
     publish_details: HashMap<String, PublishDetails>,
     sender_by_connection_id: HashMap<i32, mpsc::UnboundedSender<ConnectionMessage>>,
     key_by_connection_id: HashMap<i32, String>,
+    transcoder_by_connection_id: HashMap<i32, TranscoderManager>,
     new_disconnect_futures: Vec<BoxFuture<'a, FutureResult>>,
 }
 
@@ -51,6 +55,7 @@ impl<'a> StreamManager<'a> {
             publish_details: HashMap::new(),
             sender_by_connection_id: HashMap::new(),
             key_by_connection_id: HashMap::new(),
+            transcoder_by_connection_id: HashMap::new(),
             new_disconnect_futures: Vec::new(),
         }
     }
@@ -68,7 +73,6 @@ impl<'a> StreamManager<'a> {
         }
     }
 
-    // ERROR HERE
     async fn run(mut self, receiver: UnboundedReceiver<StreamManagerMessage>) {
         async fn new_receiver_future(
             mut receiver: UnboundedReceiver<StreamManagerMessage>,
@@ -89,7 +93,7 @@ impl<'a> StreamManager<'a> {
             match result {
                 FutureResult::MessageReceived { receiver, message } => {
                     match message {
-                        Some(message) => self.handle_message(message),
+                        Some(message) => self.handle_message(message).await,
                         None => return, // receiver has no more senders
                     }
 
@@ -97,7 +101,6 @@ impl<'a> StreamManager<'a> {
                 }
 
                 FutureResult::Disconnection { connection_id } => {
-                    trace!("Cleanup from line 99");
                     self.cleanup_connection(connection_id);
                 }
             }
@@ -110,7 +113,7 @@ impl<'a> StreamManager<'a> {
         }
     }
 
-    fn handle_message(&mut self, message: StreamManagerMessage) {
+    async fn handle_message(&mut self, message: StreamManagerMessage) {
         match message {
             StreamManagerMessage::NewConnection {
                 connection_id,
@@ -166,7 +169,7 @@ impl<'a> StreamManager<'a> {
             .push(wait_for_client_disconnection(connection_id, disconnection).boxed());
     }
 
-    fn handle_publish_request(
+    async fn handle_publish_request(
         &mut self,
         connection_id: i32,
         request_id: u32,
@@ -194,7 +197,6 @@ impl<'a> StreamManager<'a> {
                 .send(ConnectionMessage::RequestDenied { request_id })
                 .is_err()
             {
-                trace!("Cleanup from line 192");
                 self.cleanup_connection(connection_id);
             }
 
@@ -212,7 +214,6 @@ impl<'a> StreamManager<'a> {
                     .send(ConnectionMessage::RequestDenied { request_id })
                     .is_err()
                 {
-                    trace!("Cleanup from line 210");
                     self.cleanup_connection(connection_id);
                 }
 
@@ -237,6 +238,17 @@ impl<'a> StreamManager<'a> {
         {
             self.cleanup_connection(connection_id);
         }
+
+        // Initialize Transcoder
+
+        let mut transcoder = TranscoderManager::new(stream_key.clone(), connection_id.clone());
+        if transcoder.initialize(stream_key.clone()).await.is_err() {
+            self.cleanup_connection(connection_id);
+            return;
+        }
+
+        self.transcoder_by_connection_id
+            .insert(connection_id, transcoder);
     }
 
     fn handle_publish_finished(&mut self, connection_id: i32) {
@@ -264,6 +276,17 @@ impl<'a> StreamManager<'a> {
         }
 
         // TODO: Send audio data to named pipe to be processed by ffmpeg
+
+        let transcoder = match self.transcoder_by_connection_id.get(&sending_connection_id) {
+            Some(x) => x,
+            None => return,
+        };
+
+        let message = TranscoderMessage::Audio(data.clone());
+
+        if transcoder.handle_message(message).is_err() {
+            self.cleanup_connection(sending_connection_id);
+        }
     }
 
     fn handle_new_video_data(
@@ -293,6 +316,17 @@ impl<'a> StreamManager<'a> {
         }
 
         // TODO: Send video data to named pipe to be processed by ffmpeg
+
+        let transcoder = match self.transcoder_by_connection_id.get(&sending_connection_id) {
+            Some(x) => x,
+            None => return,
+        };
+
+        let message = TranscoderMessage::Video(data.clone());
+
+        if transcoder.handle_message(message).is_err() {
+            self.cleanup_connection(sending_connection_id);
+        }
     }
 
     fn handle_new_metadata(&mut self, sending_connection_id: i32, metadata: StreamMetadata) {
@@ -301,7 +335,7 @@ impl<'a> StreamManager<'a> {
             None => return,
         };
 
-        let mut details = match self.publish_details.get_mut(key) {
+        let details = match self.publish_details.get_mut(key) {
             Some(x) => x,
             None => return,
         };

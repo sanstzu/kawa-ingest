@@ -1,3 +1,5 @@
+use std::f32::consts::E;
+
 use crate::service::{transcoder_client::TranscoderClient, InitializeSessionRequest};
 
 use crate::BoxError;
@@ -9,7 +11,7 @@ mod handler;
 mod message;
 mod state;
 
-use message::Message;
+pub use message::Message;
 use state::State;
 
 #[derive(Clone)]
@@ -18,15 +20,15 @@ struct Session {
     stream_tx: UnboundedSender<Message>,
 }
 
-struct Transcoder {
+pub struct TranscoderManager {
     state: State,
     stream_key: String,
     connection_id: i32,
     session: Option<Session>,
 }
 
-impl Transcoder {
-    fn new(stream_key: String, connection_id: i32) -> Self {
+impl TranscoderManager {
+    pub fn new(stream_key: String, connection_id: i32) -> Self {
         Self {
             state: State::Uninitialized,
             stream_key,
@@ -69,17 +71,49 @@ impl Transcoder {
         }
 
         let session_id = self.session.clone().unwrap().id;
-        tokio::spawn(async move {
+        let res = tokio::spawn(async move {
             if handler::stream_handler(client, session_id, rx)
                 .await
                 .is_err()
             {
                 error!("Error handling stream");
+                return false;
             }
-        });
+            true
+        })
+        .await?;
 
-        self.state = State::Streaming;
+        if res {
+            self.state = State::Streaming;
+        } else {
+            self.state = State::Uninitialized;
+            return Err("Error handling stream".into());
+        }
 
+        Ok(())
+    }
+
+    pub fn handle_message(&self, message: Message) -> Result<(), BoxError> {
+        let stream_tx = match self.session {
+            Some(ref session) => session.stream_tx.clone(),
+            None => {
+                error!("No session found for message");
+                return Ok(());
+            }
+        };
+
+        match message {
+            Message::Audio(bytes) => {
+                if stream_tx.send(Message::Audio(bytes)).is_err() {
+                    error!("Error sending audio data to stream manager");
+                };
+            }
+            Message::Video(bytes) => {
+                if stream_tx.send(Message::Video(bytes)).is_err() {
+                    error!("Error sending video data to stream manager");
+                };
+            }
+        }
         Ok(())
     }
 }
