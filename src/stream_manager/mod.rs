@@ -129,7 +129,8 @@ impl<'a> StreamManager<'a> {
                 rtmp_app,
                 stream_key,
             } => {
-                self.handle_publish_request(connection_id, request_id, rtmp_app, stream_key);
+                self.handle_publish_request(connection_id, request_id, rtmp_app, stream_key)
+                    .await;
             }
 
             StreamManagerMessage::PublishFinished { connection_id } => {
@@ -232,23 +233,29 @@ impl<'a> StreamManager<'a> {
             },
         );
 
+        // Initialize Transcoder
+
+        let mut transcoder = TranscoderManager::new(stream_key.clone(), connection_id.clone());
+
+        if transcoder.initialize(stream_key.clone()).await.is_err() {
+            if sender
+                .send(ConnectionMessage::RequestDenied { request_id })
+                .is_err()
+            {
+                self.cleanup_connection(connection_id);
+            }
+            return;
+        }
+
+        self.transcoder_by_connection_id
+            .insert(connection_id, transcoder);
+
         if sender
             .send(ConnectionMessage::RequestAccepted { request_id })
             .is_err()
         {
             self.cleanup_connection(connection_id);
         }
-
-        // Initialize Transcoder
-
-        let mut transcoder = TranscoderManager::new(stream_key.clone(), connection_id.clone());
-        if transcoder.initialize(stream_key.clone()).await.is_err() {
-            self.cleanup_connection(connection_id);
-            return;
-        }
-
-        self.transcoder_by_connection_id
-            .insert(connection_id, transcoder);
     }
 
     fn handle_publish_finished(&mut self, connection_id: i32) {
