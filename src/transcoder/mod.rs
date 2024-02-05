@@ -53,7 +53,7 @@ impl TranscoderManager {
             .into_inner();
 
         match res.status {
-            1 => {
+            0 => {
                 self.session = Some(Session {
                     id: res.session_id,
                     stream_tx: tx,
