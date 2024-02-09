@@ -1,4 +1,4 @@
-use crate::service::{transcoder_client::TranscoderClient, StreamSessionData};
+use crate::service::{transcoder_client::TranscoderClient, CloseSessionRequest, StreamSessionData};
 use log::{error, info};
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_stream::{wrappers::UnboundedReceiverStream, StreamExt};
@@ -41,10 +41,24 @@ pub async fn stream_handler(
         .into_inner()
         .status
     {
-        1 => info!("Stream session closed successfully"),
+        0 => info!("Stream session closed successfully"),
         15 => error!("Stream session closed with error"),
         _ => error!("Stream session closed with unknown status"),
-    }
+    };
+
+    match client
+        .close_session(CloseSessionRequest {
+            session_id: session_id,
+        })
+        .await?
+        .into_inner()
+        .status
+    {
+        0 => info!("Session closed successfully"),
+        1 => error!("Session closed with error (ID not found)"),
+        15 => error!("Session closed with error"),
+        _ => error!("Session closed with unknown status"),
+    };
 
     Ok(())
 }
