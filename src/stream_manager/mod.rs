@@ -5,6 +5,7 @@ pub mod stream_manager_message;
 use bytes::Bytes;
 use futures::future::select_all;
 use futures::future::BoxFuture;
+use log::error;
 use log::info;
 
 use log::warn;
@@ -20,6 +21,9 @@ use futures::FutureExt;
 pub use publish_details::PublishDetails;
 pub use stream_manager_message::StreamManagerMessage;
 
+use crate::extractor::extract_audio;
+use crate::extractor::extract_video_frame;
+use crate::extractor::extract_video_header;
 use crate::transcoder::{Message as TranscoderMessage, TranscoderManager};
 
 pub fn start() -> mpsc::UnboundedSender<StreamManagerMessage> {
@@ -177,6 +181,7 @@ impl<'a> StreamManager<'a> {
         rtmp_app: String,
         stream_key: String,
     ) {
+        info!("Connection {} is requesting to publish", connection_id);
         let sender = match self.sender_by_connection_id.get(&connection_id) {
             None => {
                 info!(
@@ -188,6 +193,8 @@ impl<'a> StreamManager<'a> {
 
             Some(x) => x,
         };
+
+        info!("Connection {} is requesting to publish 2", connection_id);
 
         if self.key_by_connection_id.contains_key(&connection_id) {
             warn!(
@@ -203,6 +210,8 @@ impl<'a> StreamManager<'a> {
 
             return;
         }
+
+        info!("Connection {} is requesting to publish 3", connection_id);
 
         let key = format!("{}/{}", rtmp_app, stream_key);
         match self.publish_details.get(&key) {
@@ -235,9 +244,15 @@ impl<'a> StreamManager<'a> {
 
         // Initialize Transcoder
 
+        info!("Connection {} is requesting to publish 4", connection_id);
+
         let mut transcoder = TranscoderManager::new(stream_key.clone(), connection_id.clone());
 
         if transcoder.initialize(stream_key.clone()).await.is_err() {
+            error!(
+                "Failed to initialize transcoder for connection {}",
+                connection_id
+            );
             if sender
                 .send(ConnectionMessage::RequestDenied { request_id })
                 .is_err()
@@ -246,6 +261,8 @@ impl<'a> StreamManager<'a> {
             }
             return;
         }
+
+        info!("Connection {} is requesting to publish 5", connection_id);
 
         self.transcoder_by_connection_id
             .insert(connection_id, transcoder);
@@ -289,7 +306,9 @@ impl<'a> StreamManager<'a> {
             None => return,
         };
 
-        let message = TranscoderMessage::Audio(data.clone());
+        let extracted_data = extract_audio(data.clone());
+
+        let message = TranscoderMessage::Audio(extracted_data);
 
         if transcoder.handle_message(message).is_err() {
             self.cleanup_connection(sending_connection_id);
@@ -329,7 +348,12 @@ impl<'a> StreamManager<'a> {
             None => return,
         };
 
-        let message = TranscoderMessage::Video(data.clone());
+        let extracted_data = match is_video_sequence_header(&data) {
+            true => extract_video_header(data.clone()),
+            false => extract_video_frame(data.clone()),
+        };
+
+        let message = TranscoderMessage::Video(extracted_data);
 
         if transcoder.handle_message(message).is_err() {
             self.cleanup_connection(sending_connection_id);
