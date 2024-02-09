@@ -4,6 +4,7 @@ use crate::service::{transcoder_client::TranscoderClient, InitializeSessionReque
 
 use crate::BoxError;
 use bytes::Bytes;
+use dotenv::dotenv;
 use log::{error, info};
 use tokio::sync::mpsc::{self, UnboundedSender};
 
@@ -38,8 +39,8 @@ impl TranscoderManager {
     }
 
     pub async fn initialize(&mut self, publish_url: String) -> Result<(), BoxError> {
-        const TRANSCODER_SERVICE_URL: &str = "http://localhost:50051"; // TODO: Use env file to set service URL
-        let mut client = TranscoderClient::connect(TRANSCODER_SERVICE_URL).await?;
+        let transcoder_service_url = dotenv::var("TRANSCODER_SERVICE_URL")?;
+        let mut client = TranscoderClient::connect(transcoder_service_url).await?;
 
         // Initialize session
 
