@@ -4,7 +4,7 @@ use crate::service::{transcoder_client::TranscoderClient, InitializeSessionReque
 
 use crate::BoxError;
 use bytes::Bytes;
-use log::error;
+use log::{error, info};
 use tokio::sync::mpsc::{self, UnboundedSender};
 
 mod handler;
@@ -38,7 +38,7 @@ impl TranscoderManager {
     }
 
     pub async fn initialize(&mut self, publish_url: String) -> Result<(), BoxError> {
-        const TRANSCODER_SERVICE_URL: &str = "http://[::1]:50051"; // TODO: Use env file to set service URL
+        const TRANSCODER_SERVICE_URL: &str = "http://localhost:50051"; // TODO: Use env file to set service URL
         let mut client = TranscoderClient::connect(TRANSCODER_SERVICE_URL).await?;
 
         // Initialize session
@@ -71,7 +71,7 @@ impl TranscoderManager {
         }
 
         let session_id = self.session.clone().unwrap().id;
-        let res = tokio::spawn(async move {
+        tokio::spawn(async move {
             if handler::stream_handler(client, session_id, rx)
                 .await
                 .is_err()
@@ -80,15 +80,7 @@ impl TranscoderManager {
                 return false;
             }
             true
-        })
-        .await?;
-
-        if res {
-            self.state = State::Streaming;
-        } else {
-            self.state = State::Uninitialized;
-            return Err("Error handling stream".into());
-        }
+        });
 
         Ok(())
     }
