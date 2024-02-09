@@ -99,11 +99,13 @@ impl TranscoderManager {
             Message::Audio(bytes) => {
                 if stream_tx.send(Message::Audio(bytes)).is_err() {
                     error!("Error sending audio data to stream manager");
+                    return Err("Error sending audio data to stream manager".into());
                 };
             }
             Message::Video(bytes) => {
                 if stream_tx.send(Message::Video(bytes)).is_err() {
                     error!("Error sending video data to stream manager");
+                    return Err("Error sending video data to stream manager".into());
                 };
             }
         }
