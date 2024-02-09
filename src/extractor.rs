@@ -14,7 +14,7 @@ pub fn extract_audio(data: Bytes) -> Bytes {
         let protection_absent: u8 = 0x01; // 1b
 
         let profile: u8 = 0x01; // 2b
-        let sampling_frequency_index: u8 = 0x03; // 4b
+        let sampling_frequency_index: u8 = 0x03; // 4b, assuming it is 48kHz
         let private_bit: u8 = 0x00; // 1b
         let channel_configuration: u8 = 0x02; // 3b
 
