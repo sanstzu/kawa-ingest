@@ -75,6 +75,8 @@ impl<'a> StreamManager<'a> {
                 }
             }
         }
+
+        self.transcoder_by_connection_id.remove(&connection_id);
     }
 
     async fn run(mut self, receiver: UnboundedReceiver<StreamManagerMessage>) {
@@ -297,21 +299,19 @@ impl<'a> StreamManager<'a> {
 
         if is_audio_sequence_header(&data) {
             details.audio_sequence_header = Some(data.clone());
-        }
+        } else {
+            let transcoder = match self.transcoder_by_connection_id.get(&sending_connection_id) {
+                Some(x) => x,
+                None => return,
+            };
 
-        // TODO: Send audio data to named pipe to be processed by ffmpeg
+            let extracted_data = extract_audio(data.clone());
 
-        let transcoder = match self.transcoder_by_connection_id.get(&sending_connection_id) {
-            Some(x) => x,
-            None => return,
-        };
+            let message = TranscoderMessage::Audio(extracted_data);
 
-        let extracted_data = extract_audio(data.clone());
-
-        let message = TranscoderMessage::Audio(extracted_data);
-
-        if transcoder.handle_message(message).is_err() {
-            self.cleanup_connection(sending_connection_id);
+            if transcoder.handle_message(message).is_err() {
+                self.cleanup_connection(sending_connection_id);
+            }
         }
     }
 
