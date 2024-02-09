@@ -183,7 +183,6 @@ impl<'a> StreamManager<'a> {
         rtmp_app: String,
         stream_key: String,
     ) {
-        info!("Connection {} is requesting to publish", connection_id);
         let sender = match self.sender_by_connection_id.get(&connection_id) {
             None => {
                 info!(
@@ -195,8 +194,6 @@ impl<'a> StreamManager<'a> {
 
             Some(x) => x,
         };
-
-        info!("Connection {} is requesting to publish 2", connection_id);
 
         if self.key_by_connection_id.contains_key(&connection_id) {
             warn!(
@@ -212,8 +209,6 @@ impl<'a> StreamManager<'a> {
 
             return;
         }
-
-        info!("Connection {} is requesting to publish 3", connection_id);
 
         let key = format!("{}/{}", rtmp_app, stream_key);
         match self.publish_details.get(&key) {
@@ -245,8 +240,6 @@ impl<'a> StreamManager<'a> {
         );
 
         // Initialize Transcoder
-
-        info!("Connection {} is requesting to publish 4", connection_id);
 
         let mut transcoder = TranscoderManager::new(stream_key.clone(), connection_id.clone());
 
@@ -340,8 +333,6 @@ impl<'a> StreamManager<'a> {
             can_be_dropped = false;
             is_key_frame = true;
         }
-
-        // TODO: Send video data to named pipe to be processed by ffmpeg
 
         let transcoder = match self.transcoder_by_connection_id.get(&sending_connection_id) {
             Some(x) => x,
