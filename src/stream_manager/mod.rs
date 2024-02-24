@@ -24,6 +24,7 @@ pub use stream_manager_message::StreamManagerMessage;
 use crate::extractor::extract_audio;
 use crate::extractor::extract_video_frame;
 use crate::extractor::extract_video_header;
+use crate::session_manager;
 use crate::transcoder::{Message as TranscoderMessage, TranscoderManager};
 
 pub fn start() -> mpsc::UnboundedSender<StreamManagerMessage> {
@@ -239,11 +240,35 @@ impl<'a> StreamManager<'a> {
             },
         );
 
+        let publish_path = match session_manager::get_publish_url(&stream_key).await {
+            Err(x) => {
+                error!("Error getting publish url: {}", x);
+                return;
+            }
+            Ok(None) => {
+                info!(
+                    "Connection {} is requesting to publish but stream key is not found",
+                    connection_id
+                );
+                return;
+            }
+            Ok(Some(x)) => match x.is_empty() {
+                true => {
+                    info!(
+                        "Connection {} is requesting to publish but stream key is not found",
+                        connection_id
+                    );
+                    return;
+                }
+                false => x,
+            },
+        };
+
         // Initialize Transcoder
 
         let mut transcoder = TranscoderManager::new(stream_key.clone(), connection_id.clone());
 
-        if transcoder.initialize(stream_key.clone()).await.is_err() {
+        if transcoder.initialize(publish_path).await.is_err() {
             error!(
                 "Failed to initialize transcoder for connection {}",
                 connection_id

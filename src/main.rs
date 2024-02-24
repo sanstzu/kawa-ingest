@@ -5,12 +5,14 @@ use tokio::net::TcpListener;
 
 mod connection;
 mod extractor;
+mod session_manager;
 mod stream_manager;
 mod transcoder;
 
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 pub mod service {
     tonic::include_proto!("transcoder");
+    tonic::include_proto!("session_manager");
 }
 
 #[tokio::main]
