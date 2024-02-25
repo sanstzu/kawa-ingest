@@ -9,8 +9,6 @@ use log::error;
 use log::info;
 
 use log::warn;
-use prost::Message;
-use rml_rtmp::sessions::StreamMetadata;
 use rml_rtmp::time::RtmpTimestamp;
 use std::collections::hash_map::HashMap;
 use tokio::sync::mpsc;
@@ -159,10 +157,6 @@ impl<'a> StreamManager<'a> {
             } => {
                 self.handle_new_video_data(sending_connection_id, timestamp, data);
             }
-            StreamManagerMessage::UpdatedStreamMetadata {
-                sending_connection_id,
-                metadata,
-            } => self.handle_new_metadata(sending_connection_id, metadata),
         }
     }
 
@@ -302,7 +296,7 @@ impl<'a> StreamManager<'a> {
     fn handle_new_audio_data(
         &mut self,
         sending_connection_id: i32,
-        timestamp: RtmpTimestamp,
+        _timestamp: RtmpTimestamp,
         data: Bytes,
     ) {
         let key = match self.key_by_connection_id.get(&sending_connection_id) {
@@ -310,7 +304,7 @@ impl<'a> StreamManager<'a> {
             None => return,
         };
 
-        let mut details = match self.publish_details.get_mut(key) {
+        let details = match self.publish_details.get_mut(key) {
             Some(x) => x,
             None => return,
         };
@@ -336,7 +330,7 @@ impl<'a> StreamManager<'a> {
     fn handle_new_video_data(
         &mut self,
         sending_connection_id: i32,
-        timestamp: RtmpTimestamp,
+        _timestamp: RtmpTimestamp,
         data: Bytes,
     ) {
         let key = match self.key_by_connection_id.get(&sending_connection_id) {
@@ -344,19 +338,19 @@ impl<'a> StreamManager<'a> {
             None => return,
         };
 
-        let mut details = match self.publish_details.get_mut(key) {
+        let details = match self.publish_details.get_mut(key) {
             Some(x) => x,
             None => return,
         };
 
-        let mut can_be_dropped = true;
-        let mut is_key_frame = false;
+        let mut _can_be_dropped = true;
+        let mut _is_key_frame = false;
         if is_video_sequence_header(&data) {
             details.video_sequence_header = Some(data.clone());
-            can_be_dropped = false;
+            _can_be_dropped = false;
         } else if is_video_keyframe(&data) {
-            can_be_dropped = false;
-            is_key_frame = true;
+            _can_be_dropped = false;
+            _is_key_frame = true;
         }
 
         let transcoder = match self.transcoder_by_connection_id.get(&sending_connection_id) {
@@ -374,20 +368,6 @@ impl<'a> StreamManager<'a> {
         if transcoder.handle_message(message).is_err() {
             self.cleanup_connection(sending_connection_id);
         }
-    }
-
-    fn handle_new_metadata(&mut self, sending_connection_id: i32, metadata: StreamMetadata) {
-        let key = match self.key_by_connection_id.get(&sending_connection_id) {
-            Some(x) => x,
-            None => return,
-        };
-
-        let details = match self.publish_details.get_mut(key) {
-            Some(x) => x,
-            None => return,
-        };
-
-        details.metadata = Some(metadata.clone());
     }
 }
 

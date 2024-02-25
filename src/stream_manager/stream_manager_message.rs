@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use rml_rtmp::{messages::RtmpMessage, sessions::StreamMetadata, time::RtmpTimestamp};
+use rml_rtmp::time::RtmpTimestamp;
 use tokio::sync::mpsc;
 
 use super::connection_message::ConnectionMessage;
@@ -31,10 +31,5 @@ pub enum StreamManagerMessage {
 
     PublishFinished {
         connection_id: i32,
-    },
-
-    UpdatedStreamMetadata {
-        sending_connection_id: i32,
-        metadata: StreamMetadata,
     },
 }

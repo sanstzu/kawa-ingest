@@ -1,11 +1,8 @@
-use std::f32::consts::E;
-
 use crate::service::{transcoder_client::TranscoderClient, InitializeSessionRequest};
 
 use crate::BoxError;
-use bytes::Bytes;
-use dotenv::dotenv;
-use log::{error, info};
+
+use log::error;
 use tokio::sync::mpsc::{self, UnboundedSender};
 
 mod handler;
@@ -23,7 +20,7 @@ struct Session {
 
 pub struct TranscoderManager {
     state: State,
-    stream_key: String,
+    _stream_key: String,
     connection_id: i32,
     session: Option<Session>,
 }
@@ -32,7 +29,7 @@ impl TranscoderManager {
     pub fn new(stream_key: String, connection_id: i32) -> Self {
         Self {
             state: State::Uninitialized,
-            stream_key,
+            _stream_key: stream_key,
             connection_id,
             session: None,
         }
