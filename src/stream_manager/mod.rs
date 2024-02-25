@@ -244,6 +244,12 @@ impl<'a> StreamManager<'a> {
                     "Connection {} is requesting to publish but stream key is not found",
                     connection_id
                 );
+                if sender
+                    .send(ConnectionMessage::RequestDenied { request_id })
+                    .is_err()
+                {
+                    self.cleanup_connection(connection_id);
+                }
                 return;
             }
             Ok(Some(x)) => match x.is_empty() {
@@ -252,6 +258,13 @@ impl<'a> StreamManager<'a> {
                         "Connection {} is requesting to publish but stream key is not found",
                         connection_id
                     );
+
+                    if sender
+                        .send(ConnectionMessage::RequestDenied { request_id })
+                        .is_err()
+                    {
+                        self.cleanup_connection(connection_id);
+                    }
                     return;
                 }
                 false => x,
