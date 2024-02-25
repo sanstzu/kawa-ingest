@@ -7,6 +7,7 @@ use crate::{
 
 pub async fn get_publish_url(stream_key: &str) -> Result<Option<String>, BoxError> {
     let session_manager_service_url = dotenv::var("SESSION_MANAGER_SERVICE_URL")?;
+    let session_manager_service_url = format!("http://{}", session_manager_service_url);
     let mut client = SessionManagerClient::connect(session_manager_service_url).await?;
 
     let res: GetSessionResponse = client

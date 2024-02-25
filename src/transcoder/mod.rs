@@ -37,6 +37,7 @@ impl TranscoderManager {
 
     pub async fn initialize(&mut self, publish_url: String) -> Result<(), BoxError> {
         let transcoder_service_url = dotenv::var("TRANSCODER_SERVICE_URL")?;
+        let transcoder_service_url = format!("http://{}", transcoder_service_url);
         let mut client = TranscoderClient::connect(transcoder_service_url).await?;
 
         // Initialize session
