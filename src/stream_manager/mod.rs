@@ -323,6 +323,7 @@ impl<'a> StreamManager<'a> {
         };
 
         if is_audio_sequence_header(&data) {
+            // TODO: Use the header information
             details.audio_sequence_header = Some(data.clone());
         } else {
             let transcoder = match self.transcoder_by_connection_id.get(&sending_connection_id) {
